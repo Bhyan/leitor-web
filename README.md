@@ -12,10 +12,7 @@ Extensão para Chrome e Firefox, com modo leitura, marcações e comentários ar
 - Menu geral como todos os documentários do documento.
 - Todo as marcações e comentários são armazenadas no local storege do navegador.
 
-<img width="800" height="431" alt="Image" src="https://github.com/Bhyan/leitor-web/blob/main/demo.gif" />
-
 <img width="800" height="431" alt="demo" src="https://github.com/user-attachments/assets/0e525675-d6fb-40d9-8805-da5e847624f1" />
-
 
 ## Atualização sem perder anotações
 Substitua os arquivos da pasta da extensão já carregada e use **Recarregar** na página de extensões. Não desinstale a extensão anterior se quiser manter o armazenamento local.
