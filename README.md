@@ -1,4 +1,4 @@
-# Leitor Web — v1.0.0
+# Leitor Web
 
 Extensão para Chrome e Firefox, com modo leitura, marcações e comentários armazenados em `storage.local`.
 

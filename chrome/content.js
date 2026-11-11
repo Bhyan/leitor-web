@@ -5,6 +5,24 @@
   const COLORS = ['#ffe66d','#b7efc5','#b9dcff','#ffc5dc','#ffd0a6','#ddc7ff'];
   let host, shadow, reader, content, bar, key, selectionRange = null, currentSettings;
   let customColor = "#fff176";
+  let originalScrollStyles = null;
+  function lockPageScroll() {
+    if (originalScrollStyles) return;
+    const html = document.documentElement, body = document.body;
+    originalScrollStyles = [html, body].filter(Boolean).map(el => ({
+      el, value: el.style.getPropertyValue('overflow'),
+      priority: el.style.getPropertyPriority('overflow')
+    }));
+    for (const {el} of originalScrollStyles) el.style.setProperty('overflow', 'hidden', 'important');
+  }
+  function unlockPageScroll() {
+    if (!originalScrollStyles) return;
+    for (const {el,value,priority} of originalScrollStyles) {
+      if (value) el.style.setProperty('overflow', value, priority);
+      else el.style.removeProperty('overflow');
+    }
+    originalScrollStyles = null;
+  }
   const defaultSettings = { theme: 'light', size: 18, align: 'left' };
   const storage = {
     async get(k) { const obj = await api.storage.local.get(k); return obj[k]; },
@@ -59,7 +77,7 @@
     .content a{color:#5c9be8!important}.content mark.reader-highlight{color:#202020!important;cursor:pointer;border-radius:2px;text-align:inherit!important}.content mark.reader-highlight *{color:#202020!important}.content .comment-dot{color:var(--fg)!important;cursor:pointer;font-size:12px!important}
     .panel{position:fixed;right:0;top:0;height:100%;width:355px;max-width:95vw;background:var(--panel);border-left:1px solid var(--border);z-index:30;overflow:auto;padding:17px;box-shadow:-5px 0 24px #0002}
     .panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:15px}.panel-head strong{font-size:17px}.item{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin:10px 0}.item p{margin:9px 0;overflow-wrap:anywhere;line-height:1.45}.quote{border-left:5px solid var(--note-color);padding:7px;background:var(--panel)}.actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.danger{color:#d94343!important}.muted{color:var(--muted)}
-    .popup{position:fixed;z-index:45;width:310px;max-width:calc(100vw - 20px);background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;box-shadow:0 8px 28px #0005;font:14px system-ui,sans-serif}.popup textarea{width:100%;min-height:88px;resize:vertical;margin:9px 0;padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--fg)}.popup .actions{justify-content:flex-end;flex-wrap:wrap}.popup .popup-colors{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:10px}.popup .popup-colors .color{flex:0 0 27px}.popup .popup-colors .color-input{width:34px;height:30px;flex:0 0 34px}.popup .popup-colors label{display:flex;align-items:center;gap:5px;font-size:12px}.popup .popup-colors button[aria-pressed="true"]{outline:2px solid var(--fg);outline-offset:2px}.popup .actions [data-popup="delete"]{margin-right:auto;border-color:#b94040;color:#d94343;font-weight:600}.popup .actions [data-popup="delete"]:hover{background:#ffe9e9;color:#9b2525}
+    .popup{position:fixed;z-index:45;width:min(764px,calc(100vw - 20px));max-width:calc(100vw - 20px);background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;box-shadow:0 8px 28px #0005;font:14px system-ui,sans-serif}.popup textarea{width:100%;min-height:160px;resize:vertical;margin:9px 0;padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--fg)}.popup .actions{justify-content:flex-end;flex-wrap:wrap}.popup .popup-colors{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:10px}.popup .popup-colors .color{flex:0 0 27px}.popup .popup-colors .color-input{width:34px;height:30px;flex:0 0 34px}.popup .popup-colors label{display:flex;align-items:center;gap:5px;font-size:12px}.popup .popup-colors button[aria-pressed="true"]{outline:2px solid var(--fg);outline-offset:2px}.popup .actions [data-popup="delete"]{margin-right:auto;border-color:#b94040;color:#d94343;font-weight:600}.popup .actions [data-popup="delete"]:hover{background:#ffe9e9;color:#9b2525}
     .flash{outline:3px solid #4b91ef;outline-offset:3px}
     @media(max-width:600px){.content{padding:0 17px;margin-top:24px}.bar{padding:7px}.hint{display:none}.panel{width:100%;max-width:100%}}
   `;
@@ -114,7 +132,6 @@
   }
   function wrapRange(range,note) {
     if(!range || !range.toString().trim())return null;
-    // Do not nest highlights; overlapping selections are intentionally ignored.
     if(range.commonAncestorContainer.parentElement?.closest('mark.reader-highlight'))return null;
     const mark=document.createElement('mark');mark.className='reader-highlight';mark.dataset.noteId=note.id;mark.style.backgroundColor=note.color;mark.title=note.comment||'Clique para comentar';
     try{range.surroundContents(mark);}catch(_){
@@ -135,7 +152,6 @@
   }
   async function restore() {
     const list=await notes();
-    // Right-to-left keeps stored text offsets stable while wrapping.
     for(const note of [...list].sort((a,b)=>(b.start||0)-(a.start||0))){
       const range=findRange(note);if(range)wrapRange(range,note);
     }
@@ -143,7 +159,7 @@
   function dismissPopup(){shadow?.querySelector('.popup')?.remove();}
   function popupPosition(popup,rect){
     const viewportWidth=reader.clientWidth, viewportHeight=reader.clientHeight;
-    const width=popup.getBoundingClientRect().width || 310;
+    const width=popup.getBoundingClientRect().width || Math.min(764,viewportWidth-20);
     const height=popup.getBoundingClientRect().height || 280;
     popup.style.left=Math.max(10,Math.min(rect.left,viewportWidth-width-10))+'px';
     popup.style.top=Math.max(10,Math.min(rect.bottom+8,viewportHeight-height-10))+'px';
@@ -261,7 +277,7 @@
     panel.querySelector('[data-close-panel]').addEventListener('click',()=>panel.remove());reader.append(panel);await refreshPanel();
   }
   function onKey(e){if(e.key==='Escape'){if(shadow.querySelector('.popup'))dismissPopup();else if(shadow.querySelector('.panel'))shadow.querySelector('.panel').remove();else close();}}
-  function close(){document.removeEventListener('keydown',onKey,true);host?.remove();host=shadow=reader=content=bar=null;selectionRange=null;}
+  function close(){document.removeEventListener('keydown',onKey,true);unlockPageScroll();host?.remove();host=shadow=reader=content=bar=null;selectionRange=null;}
   async function open(){
     if(host){close();return;}
     key=pageKey();currentSettings={...defaultSettings,...(await storage.get('leitor:settings')||{})};
@@ -274,8 +290,7 @@
     bar.innerHTML='<div class="bar-row"><button data-action="close">✕ Sair</button><button data-action="theme"></button><button data-action="smaller">A−</button><button data-action="larger">A+</button><button data-action="align"></button><button data-action="panel">📝 Anotações</button></div>';
     reader.append(bar);
     content=document.createElement('main');content.className='content';content.append(extracted);reader.append(content);
-    document.documentElement.append(host);applySettings();
-    // Capture selection before clicking toolbar causes the browser to collapse it.
+    document.documentElement.append(host);lockPageScroll();applySettings();
     content.addEventListener('mouseup',()=>{if(rememberSelection())showSelectionPopup();});
     content.addEventListener('keyup',()=>{if(rememberSelection())showSelectionPopup();});
     bar.addEventListener('click',async e=>{
@@ -294,9 +309,7 @@
       const mark=target.matches('mark')?target:[...content.querySelectorAll('mark.reader-highlight')].find(m=>m.dataset.noteId===target.dataset.noteId);
       if(mark)showPopup(mark,mark.dataset.noteId);
     });
-    // Fechar o pop-up ao clicar fora dele, sem interferir na seleção de texto.
-    // pointerdown ocorre antes do click: clicar em outra marcação fecha o
-    // pop-up anterior e permite que o novo seja aberto normalmente.
+    
     shadow.addEventListener('pointerdown',e=>{
       const popup=shadow.querySelector('.popup');
       if(popup && !e.composedPath().includes(popup)) dismissPopup();
